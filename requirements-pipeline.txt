@@ -1,0 +1,20 @@
+# Full pipeline dependencies (for running main.py locally)
+# Install with: pip install -r requirements-pipeline.txt
+-r requirements.txt
+
+# Gradient boosting
+lightgbm==4.3.0
+xgboost==2.0.3
+catboost==1.2.5
+
+# Graph
+networkx==3.3
+node2vec==0.4.6
+
+# Resampling
+imbalanced-learn==0.12.3
+
+# System
+psutil==5.9.8
+joblib==1.4.2
+tqdm==4.66.4

@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
@@ -80,32 +79,15 @@ def _output_dir() -> Path:
 
 
 OUTPUT = _output_dir()
-DEMO_MODE = False
+
+# Demo mode: output files are committed to the repo, so this is always True
+# on Streamlit Cloud without any runtime generation needed.
+DEMO_MODE = not (OUTPUT / "val_predictions.csv").exists() or not (
+    OUTPUT / "evaluation_metrics.json"
+).exists()
 
 
-def _ensure_demo_data() -> None:
-    """Auto-generate sample data if no pipeline output exists (for hosted demo)."""
-    global DEMO_MODE
-    required = [OUTPUT / "val_predictions.csv", OUTPUT / "evaluation_metrics.json"]
-    if all(p.exists() for p in required):
-        return
-    OUTPUT.mkdir(exist_ok=True)
-    try:
-        result = subprocess.run(
-            [sys.executable, "generate_sample_data.py"],
-            capture_output=True, text=True, timeout=60,
-        )
-        if result.returncode == 0:
-            DEMO_MODE = True
-            st.cache_data.clear()
-    except Exception:
-        pass
-
-
-_ensure_demo_data()
-
-
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=3600)  # cache for 1 hour — data doesn't change between runs
 def load_predictions() -> Optional[pd.DataFrame]:
     path = OUTPUT / "val_predictions.csv"
     if not path.exists():
@@ -117,7 +99,7 @@ def load_predictions() -> Optional[pd.DataFrame]:
     return df
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=3600)
 def load_metrics() -> Optional[dict]:
     path = OUTPUT / "evaluation_metrics.json"
     if not path.exists():
@@ -126,7 +108,7 @@ def load_metrics() -> Optional[dict]:
         return json.load(f)
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=3600)
 def load_model_metrics() -> Optional[dict]:
     path = OUTPUT / "model_metrics.json"
     if not path.exists():
@@ -135,7 +117,7 @@ def load_model_metrics() -> Optional[dict]:
         return json.load(f)
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=3600)
 def load_pipeline_summary() -> Optional[dict]:
     path = OUTPUT / "pipeline_summary.json"
     if not path.exists():
@@ -163,10 +145,7 @@ def _no_data_warning():
 
 with st.sidebar:
     st.title("Fraud Detection AI")
-    if DEMO_MODE:
-        st.info("Running in **Demo Mode** with synthetic data.", icon="🎭")
-    else:
-        st.success("Live pipeline data loaded.", icon="✅")
+    st.info("Running with **synthetic demo data** (3.5% fraud rate, 5k transactions).", icon="🎭")
     st.caption(f"Output: `{OUTPUT}`")
     st.markdown("---")
     tab_names = ["Overview", "Model Performance", "Predictions", "Feature Analysis", "Pipeline Monitor"]

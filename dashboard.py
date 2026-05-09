@@ -326,13 +326,19 @@ elif page == "Predictions":
         c for c in filtered.columns
         if c not in ["fraud_probability", "predicted_fraud", "actual_fraud"]
     ]
-    styled = (
-        filtered[display_cols]
-        .head(int(max_rows))
-        .style.background_gradient(subset=["fraud_probability"], cmap="RdYlGn_r")
-        .format({"fraud_probability": "{:.4f}"})
+    display_df = filtered[display_cols].head(int(max_rows)).copy()
+    display_df["fraud_probability"] = display_df["fraud_probability"].round(4)
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        column_config={
+            "fraud_probability": st.column_config.ProgressColumn(
+                "Fraud Probability", min_value=0, max_value=1, format="%.4f"
+            ),
+            "actual_fraud": st.column_config.CheckboxColumn("Actual Fraud"),
+            "predicted_fraud": st.column_config.CheckboxColumn("Predicted Fraud"),
+        },
     )
-    st.dataframe(styled, use_container_width=True)
     st.download_button(
         "Download CSV", filtered.to_csv(index=False).encode(),
         "predictions_filtered.csv", "text/csv",
@@ -415,15 +421,14 @@ elif page == "Pipeline Monitor":
     ]
     stage_df = pd.DataFrame(rows)
 
-    def _color_status(val):
-        return {
-            "success": "background-color:#d5f5e3",
-            "failed": "background-color:#fadbd8",
-        }.get(val, "")
-
     st.dataframe(
-        stage_df.style.applymap(_color_status, subset=["Status"]),
-        hide_index=True, use_container_width=True,
+        stage_df,
+        hide_index=True,
+        use_container_width=True,
+        column_config={
+            "Status": st.column_config.TextColumn("Status"),
+            "Elapsed (s)": st.column_config.NumberColumn("Elapsed (s)", format="%.1f"),
+        },
     )
 
     fig = px.bar(

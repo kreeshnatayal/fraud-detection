@@ -1,0 +1,59 @@
+# ── Python ──────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# ── Virtual environments ─────────────────────────────────────
+venv/
+.venv/
+env/
+.env
+
+# ── Jupyter ──────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb        # keep notebooks out of the public repo (large + binary-diff unfriendly)
+
+# ── Data files (too large for GitHub, contain PII) ──────────
+*.csv
+*.parquet
+*.feather
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+*.npy
+*.npz
+
+# ── Model artefacts ──────────────────────────────────────────
+output/trained_pipeline.pkl
+checkpoints/
+
+# ── Pipeline output (regenerated on run) ─────────────────────
+# Keep sample output files that power the demo
+!output/val_predictions.csv
+!output/evaluation_metrics.json
+!output/model_metrics.json
+!output/pipeline_summary.json
+
+# ── OS / editor ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Secrets ──────────────────────────────────────────────────
+.env
+.env.*
+secrets.toml

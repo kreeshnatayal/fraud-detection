@@ -1,9 +1,3 @@
-"""
-Fraud detection pipeline orchestrator.
-Ties together data loading, feature engineering, model training, and evaluation,
-with checkpoint-based recovery at every stage.
-"""
-
 from __future__ import annotations
 
 import gc
@@ -11,40 +5,31 @@ import json
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
-import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from config import Config
-from features import (
+from src.fraud_detection.config import Config
+from src.fraud_detection.features.graph import (
     attach_embeddings,
     build_transaction_graph,
     extract_graph_features,
     generate_node2vec_embeddings,
-    run_feature_engineering,
 )
-from models import (
-    TrainedPipeline,
-    calculate_metrics,
-    select_features,
-    train_full_pipeline,
-)
-from utils import (
+from src.fraud_detection.features.pipeline import run_feature_engineering
+from src.fraud_detection.models.trained_pipeline import TrainedPipeline
+from src.fraud_detection.models.evaluate import calculate_metrics
+from src.fraud_detection.models.selection import select_features
+from src.fraud_detection.models.train import train_full_pipeline
+from src.fraud_detection.utils import (
     CheckpointManager,
     PipelineTracker,
     get_logger,
     load_data,
-    memory_guard,
-    reduce_memory_usage,
     safe_category_encode,
 )
 
 logger = get_logger(__name__)
 
-
-# ---------------------------------------------------------------------------
-# Drift detection
-# ---------------------------------------------------------------------------
 
 def detect_drift(
     reference_metrics: Dict,
@@ -62,22 +47,12 @@ def detect_drift(
     return alerts
 
 
-# ---------------------------------------------------------------------------
-# Pipeline
-# ---------------------------------------------------------------------------
-
 class FraudDetectionPipeline:
-    """Orchestrates every stage of the fraud detection workflow."""
-
     def __init__(self, config: Config = None):
         self.cfg = config or Config()
         self.cfg.ensure_dirs()
         self.tracker = PipelineTracker(self.cfg.OUTPUT_DIR)
         self.ckpt = CheckpointManager(self.cfg.CHECKPOINT_DIR)
-
-    # -----------------------------------------------------------------------
-    # Stage 1: Data loading
-    # -----------------------------------------------------------------------
 
     def _stage_load(self) -> pd.DataFrame:
         stage = "data_loading"
@@ -95,10 +70,6 @@ class FraudDetectionPipeline:
             self.tracker.end_stage(stage, success=False)
             raise RuntimeError(f"Data loading failed: {exc}") from exc
 
-    # -----------------------------------------------------------------------
-    # Stage 2: Feature engineering
-    # -----------------------------------------------------------------------
-
     def _stage_features(self, df: pd.DataFrame) -> pd.DataFrame:
         stage = "feature_engineering"
         if self.cfg.RESUME_FROM_CHECKPOINT and self.ckpt.exists(stage):
@@ -114,10 +85,6 @@ class FraudDetectionPipeline:
         except Exception as exc:
             self.tracker.end_stage(stage, success=False)
             raise RuntimeError(f"Feature engineering failed: {exc}") from exc
-
-    # -----------------------------------------------------------------------
-    # Stage 3: Graph features
-    # -----------------------------------------------------------------------
 
     def _stage_graph(self, df: pd.DataFrame) -> pd.DataFrame:
         stage = "graph_features"
@@ -147,10 +114,6 @@ class FraudDetectionPipeline:
             self.tracker.end_stage(stage, success=False)
             return df
 
-    # -----------------------------------------------------------------------
-    # Stage 4: Prepare train/val splits
-    # -----------------------------------------------------------------------
-
     def _stage_prepare(
         self, df: pd.DataFrame
     ) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
@@ -159,8 +122,6 @@ class FraudDetectionPipeline:
 
         y = df["isFraud"].astype(int)
         X = df.drop(columns=["isFraud"], errors="ignore")
-
-        # Drop remaining non-numeric columns that can't be encoded
         X = safe_category_encode(X)
         X = X.fillna(0)
 
@@ -179,10 +140,6 @@ class FraudDetectionPipeline:
             len(y_val), 100 * y_val.mean(),
         )
         return X_train, y_train, X_val, y_val
-
-    # -----------------------------------------------------------------------
-    # Stage 5: Model training
-    # -----------------------------------------------------------------------
 
     def _stage_train(
         self,
@@ -207,10 +164,6 @@ class FraudDetectionPipeline:
             self.tracker.end_stage(stage, success=False)
             raise RuntimeError(f"Model training failed: {exc}") from exc
 
-    # -----------------------------------------------------------------------
-    # Stage 6: Evaluation & monitoring
-    # -----------------------------------------------------------------------
-
     def _stage_evaluate(
         self,
         trained: TrainedPipeline,
@@ -223,19 +176,16 @@ class FraudDetectionPipeline:
             val_proba = trained.predict_proba(X_val)
             metrics = calculate_metrics(y_val.values, val_proba, trained.threshold, label="final_eval")
 
-            # Persist metrics for dashboard
             out = Path(self.cfg.OUTPUT_DIR) / "evaluation_metrics.json"
             with open(out, "w") as f:
                 json.dump(metrics, f, indent=2, default=str)
 
-            # Persist full predictions for dashboard
             preds_df = X_val.copy()
             preds_df["fraud_probability"] = val_proba
             preds_df["predicted_fraud"] = trained.predict(X_val)
             preds_df["actual_fraud"] = y_val.values
             preds_df.to_csv(Path(self.cfg.OUTPUT_DIR) / "val_predictions.csv", index=False)
 
-            # Persist model metrics history
             all_metrics = {k: v for k, v in trained.metrics.items()}
             with open(Path(self.cfg.OUTPUT_DIR) / "model_metrics.json", "w") as f:
                 json.dump(all_metrics, f, indent=2, default=str)
@@ -246,12 +196,7 @@ class FraudDetectionPipeline:
             self.tracker.end_stage("evaluation", success=False)
             raise RuntimeError(f"Evaluation failed: {exc}") from exc
 
-    # -----------------------------------------------------------------------
-    # Public API
-    # -----------------------------------------------------------------------
-
     def run(self) -> Dict:
-        """Execute the full pipeline end-to-end."""
         logger.info("=" * 70)
         logger.info("FRAUD DETECTION PIPELINE — START")
         logger.info("=" * 70)
@@ -270,7 +215,6 @@ class FraudDetectionPipeline:
         amt_series = pd.Series(amounts[y_val.index]) if amounts is not None else None
         metrics = self._stage_evaluate(trained, X_val, y_val, amounts=amt_series)
 
-        # Save final model
         model_path = Path(self.cfg.OUTPUT_DIR) / "trained_pipeline.pkl"
         trained.save(str(model_path))
 

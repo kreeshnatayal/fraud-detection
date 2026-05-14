@@ -1,0 +1,25 @@
+# Render deployment configuration
+# Deploy: https://render.com → New Web Service → connect GitHub repo
+
+services:
+  # ── Streamlit Dashboard ───────────────────────────────────────────────────
+  - type: web
+    name: fraud-risk-dashboard
+    runtime: python
+    buildCommand: pip install -r requirements.txt && python generate_sample_data.py
+    startCommand: streamlit run dashboard.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+
+  # ── FastAPI Scoring API ───────────────────────────────────────────────────
+  - type: web
+    name: fraud-risk-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt && python generate_sample_data.py
+    startCommand: uvicorn api:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: FRAUD_OUTPUT_DIR
+        value: ./output

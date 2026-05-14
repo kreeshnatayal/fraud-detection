@@ -21,7 +21,7 @@ env/
 
 # ── Jupyter ──────────────────────────────────────────────────
 .ipynb_checkpoints/
-*.ipynb        # keep notebooks out of the public repo (large + binary-diff unfriendly)
+*.ipynb
 
 # ── Data files (too large for GitHub, contain PII) ──────────
 *.csv
@@ -39,7 +39,6 @@ output/trained_pipeline.pkl
 checkpoints/
 
 # ── Pipeline output (regenerated on run) ─────────────────────
-# Keep sample output files that power the demo
 !output/val_predictions.csv
 !output/evaluation_metrics.json
 !output/model_metrics.json
@@ -57,3 +56,6 @@ Thumbs.db
 .env
 .env.*
 secrets.toml
+
+# ── Build artefacts ──────────────────────────────────────────
+src/*.egg-info/
